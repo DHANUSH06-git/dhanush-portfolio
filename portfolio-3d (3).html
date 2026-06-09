@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dhanush · Visual Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,200;0,300;0,400;0,500;1,300&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#03050f;
+  --surface:#070b1a;
+  --border:#0e1530;
+  --accent:#0066ff;
+  --accent-bright:#3d8bff;
+  --accent-glow:rgba(0,102,255,0.35);
+  --accent2:#00d1ff;
+  --accent3:#00f5a0;
+  --text:#e8eeff;
+  --muted:#3d4a6b;
+  --card:#060a18;
+}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-weight:300;overflow-x:hidden;cursor:none;}
+
+/* ── CURSOR (magnetic ring + dot) ── */
+#cur{
+  position:fixed;width:8px;height:8px;
+  background:var(--accent-bright);border-radius:50%;
+  pointer-events:none;z-index:9999;
+  transform:translate(-50%,-50%);
+  transition:width .2s,height .2s,background .2s;
+  mix-blend-mode:screen;
+}
+#cur-ring{
+  position:fixed;width:44px;height:44px;
+  border:1.5px solid rgba(61,139,255,.6);
+  border-radius:50%;pointer-events:none;z-index:9998;
+  transform:translate(-50%,-50%);
+  transition:width .3s cubic-bezier(.25,.46,.45,.94),height .3s cubic-bezier(.25,.46,.45,.94),border-color .3s,opacity .2s;
+}
+body.on-magnet #cur-ring{width:70px;height:70px;border-color:var(--accent2);border-width:1px;}
+body.on-magnet #cur{width:5px;height:5px;}
+body.clicking #cur{width:14px;height:14px;background:var(--accent2);}
+
+/* ── CONSTELLATION CANVAS ── */
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:500;padding:1.3rem 3rem;display:flex;justify-content:space-between;align-items:center;transition:all .4s;border-bottom:1px solid transparent;}
+nav.scrolled{background:rgba(3,5,15,.85);backdrop-filter:blur(20px);border-color:var(--border);}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:1.9rem;letter-spacing:.06em;color:var(--text);text-decoration:none;transition:color .2s;}
+.logo span{color:var(--accent-bright);}
+.logo:hover{color:var(--accent2);}
+.nav-links{display:flex;gap:2.5rem;list-style:none;}
+.nav-links a{font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .2s;position:relative;}
+.nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:var(--accent-bright);transition:width .3s;}
+.nav-links a:hover{color:var(--text);}
+.nav-links a:hover::after{width:100%;}
+.nav-cta{padding:.45rem 1.2rem!important;border:1px solid rgba(61,139,255,.4)!important;color:var(--accent-bright)!important;transition:all .25s!important;}
+.nav-cta:hover{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important;}
+.nav-cta::after{display:none!important;}
+
+/* ── HERO ── */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;padding:0 3rem 4.5rem;position:relative;z-index:10;}
+.hero-badge{display:inline-flex;align-items:center;gap:.6rem;font-family:'Space Mono',monospace;font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--accent-bright);border:1px solid rgba(61,139,255,.3);padding:.35rem .9rem;margin-bottom:1.5rem;opacity:0;animation:fadeUp .7s .2s ease forwards;backdrop-filter:blur(6px);}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent3);box-shadow:0 0 8px var(--accent3);animation:bpulse 1.4s infinite;}
+@keyframes bpulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,245,160,.5);}50%{box-shadow:0 0 0 6px rgba(0,245,160,0);}}
+h1.hero-h{font-family:'Bebas Neue',sans-serif;font-size:clamp(5rem,13vw,14rem);line-height:.86;letter-spacing:-.01em;opacity:0;animation:fadeUp .9s .3s ease forwards;}
+h1.hero-h .ol{color:transparent;-webkit-text-stroke:1.5px rgba(232,238,255,.15);}
+h1.hero-h .blue{color:var(--accent-bright);text-shadow:0 0 60px rgba(61,139,255,.4);}
+.hero-sub-row{display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;margin-top:2.5rem;opacity:0;animation:fadeUp .9s .46s ease forwards;}
+.hero-desc{font-size:.95rem;line-height:1.85;color:var(--muted);max-width:400px;}
+.hero-actions{display:flex;gap:1rem;flex-shrink:0;}
+.btn-blue{display:inline-flex;align-items:center;gap:.75rem;padding:.9rem 2rem;background:var(--accent);color:#fff;font-size:.72rem;font-weight:500;letter-spacing:.13em;text-transform:uppercase;text-decoration:none;transition:all .25s;box-shadow:0 0 0 0 var(--accent-glow);}
+.btn-blue:hover{background:var(--accent-bright);box-shadow:0 0 30px var(--accent-glow),0 0 60px rgba(0,102,255,.15);transform:translateY(-2px);}
+.btn-ghost{display:inline-flex;align-items:center;gap:.75rem;padding:.9rem 2rem;background:transparent;color:var(--text);font-size:.72rem;font-weight:500;letter-spacing:.13em;text-transform:uppercase;text-decoration:none;border:1px solid var(--border);transition:all .25s;}
+.btn-ghost:hover{border-color:var(--accent-bright);color:var(--accent-bright);box-shadow:0 0 20px rgba(61,139,255,.1);transform:translateY(-2px);}
+@keyframes fadeUp{from{opacity:0;transform:translateY(30px);}to{opacity:1;transform:translateY(0);}}
+
+/* scroll line */
+.scroll-hint{position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.5rem;opacity:0;animation:fadeUp .8s .9s ease forwards;}
+.scroll-hint span{font-family:'Space Mono',monospace;font-size:.5rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);}
+.scroll-line{width:1px;height:40px;background:linear-gradient(to bottom,var(--accent-bright),transparent);animation:spulse 1.8s infinite;}
+@keyframes spulse{0%{transform:scaleY(0);transform-origin:top;}50%{transform:scaleY(1);transform-origin:top;}51%{transform:scaleY(1);transform-origin:bottom;}100%{transform:scaleY(0);transform-origin:bottom;}}
+
+/* ── TICKER ── */
+.ticker{border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:.85rem 0;overflow:hidden;z-index:10;position:relative;background:var(--bg);}
+.ticker-track{display:flex;animation:tick 28s linear infinite;white-space:nowrap;}
+.ti{display:inline-flex;align-items:center;gap:1rem;padding:0 2rem;font-size:.65rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);flex-shrink:0;}
+.ti .dot{color:var(--accent-bright);}
+@keyframes tick{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+
+/* ── SECTION ── */
+.section{padding:6rem 3rem;position:relative;z-index:10;}
+.sec-border{border-top:1px solid var(--border);}
+.sec-eyebrow{font-family:'Space Mono',monospace;font-size:.62rem;letter-spacing:.22em;color:var(--accent-bright);text-transform:uppercase;display:flex;align-items:center;gap:1rem;margin-bottom:3.5rem;}
+.sec-eyebrow::after{content:'';height:1px;width:50px;background:rgba(61,139,255,.4);}
+
+/* ── WORKS GRID ── */
+.works-section{padding:6rem 3rem;position:relative;z-index:10;border-top:1px solid var(--border);}
+.ig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-bottom:2.5rem;}
+.ig-post{aspect-ratio:1;position:relative;overflow:hidden;background:var(--card);border:1px solid var(--border);cursor:none;transition:transform .4s cubic-bezier(.25,.46,.45,.94),border-color .3s,box-shadow .3s;}
+.ig-post:hover{border-color:rgba(61,139,255,.4);box-shadow:0 0 40px rgba(0,102,255,.12),0 0 80px rgba(0,102,255,.06);}
+.ig-cover{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(3,5,15,.75);transition:opacity .35s;backdrop-filter:blur(4px);}
+.ig-post:hover .ig-cover{opacity:0;pointer-events:none;}
+.ig-play{width:56px;height:56px;border:1.5px solid var(--accent-bright);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:.8rem;box-shadow:0 0 20px rgba(61,139,255,.3);}
+.ig-play::after{content:'';width:0;height:0;border-style:solid;border-width:10px 0 10px 18px;border-color:transparent transparent transparent var(--accent-bright);margin-left:4px;}
+.ig-cover-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(232,238,255,.4);}
+.ig-post-info{position:absolute;bottom:0;left:0;right:0;padding:.9rem 1rem;background:linear-gradient(transparent,rgba(3,5,15,.92));z-index:3;opacity:0;transform:translateY(6px);transition:all .3s;}
+.ig-post:hover .ig-post-info{opacity:1;transform:translateY(0);}
+.ig-post-cat{font-family:'Space Mono',monospace;font-size:.55rem;letter-spacing:.18em;color:var(--accent2);text-transform:uppercase;margin-bottom:.2rem;}
+.ig-post-title{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--text);letter-spacing:.04em;}
+
+/* ── REEL STRIP ── */
+.reel-strip-wrap{padding:3.5rem 0;border-top:1px solid var(--border);position:relative;z-index:10;overflow:hidden;}
+.reel-label{font-family:'Space Mono',monospace;font-size:.62rem;letter-spacing:.22em;color:var(--accent-bright);text-transform:uppercase;padding:0 3rem;margin-bottom:1.4rem;display:flex;align-items:center;gap:.8rem;}
+.reel-label::after{content:'← drag →';font-size:.52rem;color:var(--muted);letter-spacing:.12em;}
+.reel-strip{display:flex;gap:1.2rem;padding:.5rem 3rem 1rem;overflow-x:auto;cursor:grab;user-select:none;-ms-overflow-style:none;scrollbar-width:none;}
+.reel-strip::-webkit-scrollbar{display:none;}
+.reel-strip.dragging{cursor:grabbing;}
+.reel-item{flex-shrink:0;width:190px;height:320px;background:var(--card);border:1px solid var(--border);position:relative;overflow:hidden;transition:transform .35s,border-color .3s,box-shadow .3s;}
+.reel-item:hover{transform:translateY(-8px);border-color:rgba(61,139,255,.3);box-shadow:0 20px 40px rgba(0,0,0,.4),0 0 30px rgba(0,102,255,.1);}
+.reel-item-bg{width:100%;height:72%;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+.reel-item-info{padding:.7rem .9rem;}
+.reel-item-tag{font-family:'Space Mono',monospace;font-size:.49rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-bright);margin-bottom:.2rem;}
+.reel-item-name{font-size:.76rem;font-weight:400;color:var(--text);line-height:1.3;}
+
+/* ── SERVICES ── */
+.svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;}
+.svc{background:var(--card);border:1px solid var(--border);padding:2rem;position:relative;overflow:hidden;transform-style:preserve-3d;transition:border-color .3s,box-shadow .3s;cursor:none;}
+.svc::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(61,139,255,.07),transparent 60%);opacity:0;transition:opacity .3s;pointer-events:none;}
+.svc:hover::before{opacity:1;}
+.svc:hover{border-color:rgba(61,139,255,.25);box-shadow:0 0 30px rgba(0,102,255,.08);}
+.svc-n{font-family:'Bebas Neue',sans-serif;font-size:4rem;color:rgba(61,139,255,.1);line-height:1;margin-bottom:.5rem;}
+.svc-icon{width:44px;height:44px;background:rgba(61,139,255,.07);display:flex;align-items:center;justify-content:center;margin-bottom:1.4rem;}
+.svc-icon svg{width:22px;height:22px;stroke:var(--accent-bright);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+.svc-title{font-family:'Bebas Neue',sans-serif;font-size:1.7rem;letter-spacing:.04em;margin-bottom:.6rem;}
+.svc-desc{font-size:.8rem;line-height:1.75;color:var(--muted);}
+.svc-tags{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:1.2rem;}
+.tag{font-family:'Space Mono',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;padding:.2rem .55rem;background:rgba(61,139,255,.05);border:1px solid rgba(61,139,255,.15);color:rgba(232,238,255,.4);}
+
+/* ── ABOUT ── */
+.about-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:5rem;align-items:start;}
+.about-h{font-family:'Bebas Neue',sans-serif;font-size:clamp(3rem,5vw,5.5rem);line-height:.9;margin-bottom:1.8rem;}
+.about-h span{color:var(--accent-bright);text-shadow:0 0 40px rgba(61,139,255,.3);}
+.about-p{font-size:.9rem;line-height:1.92;color:var(--muted);margin-bottom:1rem;}
+.about-p.hl{color:rgba(232,238,255,.5);font-style:italic;border-left:2px solid var(--accent-bright);padding-left:1rem;margin-top:1.4rem;}
+.skill-bars{margin-top:2.5rem;}
+.sb{margin-bottom:1.3rem;}
+.sb-top{display:flex;justify-content:space-between;margin-bottom:.4rem;}
+.sb-name{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--text);}
+.sb-pct{font-family:'Space Mono',monospace;font-size:.62rem;color:var(--accent-bright);}
+.sb-track{height:2px;background:rgba(255,255,255,.04);}
+.sb-fill{height:100%;background:linear-gradient(90deg,var(--accent),rgba(0,209,255,.5));transform-origin:left;animation:grow 1.6s ease both;}
+@keyframes grow{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+
+/* profile card */
+.profile-card{background:var(--card);border:1px solid var(--border);padding:2.2rem;position:sticky;top:7rem;transform-style:preserve-3d;transition:box-shadow .3s;}
+.profile-card:hover{box-shadow:0 20px 60px rgba(0,102,255,.12);}
+.av{width:68px;height:68px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:#fff;letter-spacing:.05em;margin-bottom:1.3rem;box-shadow:0 0 0 4px rgba(61,139,255,.15),0 0 20px rgba(61,139,255,.2);}
+.pname{font-family:'Bebas Neue',sans-serif;font-size:1.7rem;letter-spacing:.05em;margin-bottom:.2rem;}
+.prole{font-size:.68rem;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-bottom:1.8rem;}
+.pstat{display:flex;justify-content:space-between;align-items:center;padding:.8rem 0;border-bottom:1px solid var(--border);}
+.pstat:last-of-type{border-bottom:none;}
+.pslbl{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+.psval{font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:.04em;}
+.psval.live{color:var(--accent3);}
+.pc-ig{display:flex;align-items:center;justify-content:center;gap:.7rem;width:100%;padding:.85rem;margin-top:1.4rem;border:1px solid rgba(61,139,255,.35);color:var(--accent-bright);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;transition:all .25s;}
+.pc-ig:hover{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 25px var(--accent-glow);}
+.pc-mail{display:flex;align-items:center;justify-content:center;gap:.7rem;width:100%;padding:.85rem;margin-top:.5rem;border:1px solid var(--border);color:var(--muted);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;transition:all .25s;}
+.pc-mail:hover{border-color:var(--accent-bright);color:var(--accent-bright);}
+
+/* stats bar */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-top:3rem;}
+.stat-item{background:var(--card);padding:2rem 1.5rem;text-align:center;}
+.stat-num{font-family:'Bebas Neue',sans-serif;font-size:3rem;color:var(--accent-bright);line-height:1;text-shadow:0 0 30px rgba(61,139,255,.3);}
+.stat-lbl{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:.4rem;}
+
+/* ── FEATURED ── */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;margin-bottom:2rem;}
+.fc{background:var(--card);border:1px solid var(--border);padding:1.6rem;position:relative;overflow:hidden;transform-style:preserve-3d;transition:border-color .3s,box-shadow .3s,transform .05s linear;cursor:none;}
+.fc::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(61,139,255,.07),transparent 65%);opacity:0;transition:opacity .3s;pointer-events:none;}
+.fc:hover::before{opacity:1;}
+.fc:hover{border-color:rgba(61,139,255,.25);box-shadow:0 0 30px rgba(0,102,255,.08);}
+.fc.wide{grid-column:span 2;}
+.fc-icon{font-size:1.5rem;margin-bottom:.9rem;display:block;}
+.fc-title{font-family:'Bebas Neue',sans-serif;font-size:1.25rem;letter-spacing:.04em;margin-bottom:.5rem;}
+.fc-desc{font-size:.78rem;line-height:1.78;color:var(--muted);}
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);}
+.sg-item{background:var(--card);padding:1.5rem;display:flex;align-items:flex-start;gap:.9rem;}
+.sg-icon{font-size:1.1rem;margin-top:.1rem;}
+.sg-text strong{display:block;font-size:.74rem;font-weight:500;color:var(--text);letter-spacing:.04em;margin-bottom:.25rem;}
+.sg-text span{font-size:.76rem;line-height:1.6;color:var(--muted);}
+
+/* ── CONTACT ── */
+.contact-wrap{text-align:center;padding:8rem 3rem;border-top:1px solid var(--border);position:relative;z-index:10;}
+.contact-h{font-family:'Bebas Neue',sans-serif;font-size:clamp(4rem,12vw,12rem);line-height:.88;letter-spacing:-.02em;margin-bottom:1.5rem;}
+.contact-h .ol{color:transparent;-webkit-text-stroke:1px rgba(232,238,255,.12);}
+.contact-sub{font-size:.95rem;line-height:1.82;color:var(--muted);max-width:420px;margin:0 auto 1.5rem;}
+.contact-pills{display:flex;justify-content:center;gap:1.5rem;margin-bottom:3rem;flex-wrap:wrap;}
+.cpill{display:flex;align-items:center;gap:.6rem;font-size:.78rem;color:var(--muted);padding:.5rem 1rem;border:1px solid var(--border);}
+.cpill svg{width:14px;height:14px;stroke:var(--accent-bright);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+.contact-btns{display:flex;justify-content:center;gap:1rem;flex-wrap:wrap;}
+
+/* ── FOOTER ── */
+footer{border-top:1px solid var(--border);padding:1.8rem 3rem;display:flex;justify-content:space-between;align-items:center;font-size:.68rem;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;position:relative;z-index:10;}
+footer a{color:var(--muted);text-decoration:none;transition:color .2s;}
+footer a:hover{color:var(--accent-bright);}
+
+/* ── MAGNETIC ELEMENTS ── */
+.mag{transition:transform .25s cubic-bezier(.25,.46,.45,.94);}
+
+/* ── REVEAL ── */
+.rv{opacity:0;transform:translateY(28px);transition:opacity .75s ease,transform .75s ease;}
+.rv.on{opacity:1;transform:translateY(0);}
+.rv2{opacity:0;transform:translateY(28px);transition:opacity .75s .12s ease,transform .75s .12s ease;}
+.rv2.on{opacity:1;transform:translateY(0);}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  nav{padding:1.1rem 1.5rem;}
+  .hero{padding:0 1.5rem 4rem;}
+  .hero-h{font-size:4.2rem;}
+  .hero-sub-row{flex-direction:column;align-items:flex-start;}
+  .ig-grid{grid-template-columns:1fr 1fr;}
+  .svc-grid{grid-template-columns:1fr;}
+  .about-grid{grid-template-columns:1fr;gap:3rem;}
+  .profile-card{position:static;}
+  .stats-bar{grid-template-columns:repeat(2,1fr);}
+  .feat-grid{grid-template-columns:1fr;}
+  .fc.wide{grid-column:span 1;}
+  .stat-grid{grid-template-columns:1fr;}
+  .contact-h{font-size:4rem;}
+  footer{flex-direction:column;gap:.8rem;text-align:center;}
+  .section,.works-section,.reel-strip-wrap{padding:4rem 1.5rem;}
+  body{cursor:auto;}
+  #cur,#cur-ring{display:none;}
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+<div id="cur"></div>
+<div id="cur-ring"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <a href="#" class="logo mag">DN<span>.</span></a>
+  <ul class="nav-links">
+    <li><a href="#works" class="mag">Works</a></li>
+    <li><a href="#services" class="mag">Services</a></li>
+    <li><a href="#about" class="mag">About</a></li>
+    <li><a href="#contact" class="nav-cta mag">Hire Me</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="home">
+  <div class="hero-badge"><span class="live-dot"></span>Open to Freelance Work</div>
+  <h1 class="hero-h">
+    VISUAL<br>
+    <span class="blue">EDITOR</span><br>
+    <span class="ol">&amp; CREATOR</span>
+  </h1>
+  <div class="hero-sub-row">
+    <p class="hero-desc">Cinematic storytelling, motion graphics &amp; high-impact social content. Based in India — working globally.</p>
+    <div class="hero-actions">
+      <a href="#works" class="btn-blue mag">
+        View Works
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="mailto:gdhanush447@gmail.com" class="btn-ghost mag">Get in Touch</a>
+    </div>
+  </div>
+  <div class="scroll-hint"><div class="scroll-line"></div><span>Scroll</span></div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-track">
+    <span class="ti">Video Editing<span class="dot"> ✦</span></span>
+    <span class="ti">Poster Design<span class="dot"> ✦</span></span>
+    <span class="ti">Motion Graphics<span class="dot"> ✦</span></span>
+    <span class="ti">CapCut<span class="dot"> ✦</span></span>
+    <span class="ti">After Effects<span class="dot"> ✦</span></span>
+    <span class="ti">Premiere Pro<span class="dot"> ✦</span></span>
+    <span class="ti">Blender 3D<span class="dot"> ✦</span></span>
+    <span class="ti">Color Grading<span class="dot"> ✦</span></span>
+    <span class="ti">Reels &amp; Shorts<span class="dot"> ✦</span></span>
+    <span class="ti">Cinematic Edits<span class="dot"> ✦</span></span>
+    <span class="ti">Visual Storytelling<span class="dot"> ✦</span></span>
+    <span class="ti">Video Editing<span class="dot"> ✦</span></span>
+    <span class="ti">Poster Design<span class="dot"> ✦</span></span>
+    <span class="ti">Motion Graphics<span class="dot"> ✦</span></span>
+    <span class="ti">CapCut<span class="dot"> ✦</span></span>
+    <span class="ti">After Effects<span class="dot"> ✦</span></span>
+    <span class="ti">Premiere Pro<span class="dot"> ✦</span></span>
+    <span class="ti">Blender 3D<span class="dot"> ✦</span></span>
+    <span class="ti">Color Grading<span class="dot"> ✦</span></span>
+    <span class="ti">Reels &amp; Shorts<span class="dot"> ✦</span></span>
+    <span class="ti">Cinematic Edits<span class="dot"> ✦</span></span>
+    <span class="ti">Visual Storytelling<span class="dot"> ✦</span></span>
+  </div>
+</div>
+
+<!-- WORKS -->
+<section class="works-section" id="works">
+  <div class="sec-eyebrow rv">Best Works — @dnus6h</div>
+  <div class="ig-grid rv">
+
+    <div class="ig-post">
+      <div class="ig-cover"><div class="ig-play"></div><span class="ig-cover-label">Click to reveal</span></div>
+      <div class="ig-post-info"><div class="ig-post-cat">Video Edit</div><div class="ig-post-title">Cinematic Reel</div></div>
+      <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/dnus6h/" data-instgrm-version="14" style="background:#fff;border:0;margin:0;max-width:100%;min-width:100%;padding:0;width:100%;height:100%;"></blockquote>
+    </div>
+
+    <div class="ig-post">
+      <div class="ig-cover"><div class="ig-play"></div><span class="ig-cover-label">Click to reveal</span></div>
+      <div class="ig-post-info"><div class="ig-post-cat">Motion Graphics</div><div class="ig-post-title">Title Sequence</div></div>
+      <div style="width:100%;height:100%;background:#04080f;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem;position:relative;overflow:hidden;">
+        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(0,209,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,209,255,.05) 1px,transparent 1px);background-size:36px 36px;animation:gm 9s linear infinite;"></div>
+        <div style="position:relative;z-index:1;font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:var(--accent2);letter-spacing:.15em;text-shadow:0 0 30px rgba(0,209,255,.5);">MOTION</div>
+        <a href="https://www.instagram.com/dnus6h/" target="_blank" style="position:relative;z-index:1;font-family:'Space Mono',monospace;font-size:.55rem;letter-spacing:.15em;color:rgba(61,139,255,.7);text-decoration:none;text-transform:uppercase;">@dnus6h ↗</a>
+      </div>
+    </div>
+
+    <div class="ig-post">
+      <div class="ig-cover"><div class="ig-play"></div><span class="ig-cover-label">Click to reveal</span></div>
+      <div class="ig-post-info"><div class="ig-post-cat">Poster Design</div><div class="ig-post-title">Visual Poster</div></div>
+      <div style="width:100%;height:100%;background:#03050f;display:flex;flex-direction:column;padding:1.5rem;justify-content:space-between;position:relative;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(0,102,255,.15),transparent 60%);"></div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--text);line-height:.9;position:relative;z-index:1;">POSTER<br><span style="color:var(--accent-bright);">DESIGN</span></div>
+        <div style="position:relative;z-index:1;">
+          <div style="width:32px;height:2px;background:var(--accent-bright);margin-bottom:.7rem;box-shadow:0 0 10px rgba(61,139,255,.6);"></div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
+            <div style="height:20px;background:rgba(61,139,255,.2);"></div>
+            <div style="height:20px;background:rgba(0,209,255,.15);"></div>
+            <div style="height:20px;background:rgba(61,139,255,.2);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem 0 0;" class="rv2">
+    <p style="font-size:.78rem;color:var(--muted);">More works on Instagram ↗</p>
+    <a href="https://www.instagram.com/dnus6h/" target="_blank" class="btn-ghost mag" style="font-size:.68rem;padding:.65rem 1.4rem;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+      @dnus6h
+    </a>
+  </div>
+</section>
+
+<!-- DRAGGABLE REEL STRIP -->
+<div class="reel-strip-wrap">
+  <div class="reel-label">Project Types</div>
+  <div class="reel-strip" id="reelStrip">
+
+    <div class="reel-item">
+      <div class="reel-item-bg" style="background:#03060f;">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+          <div style="width:50px;height:50px;border:1.5px solid var(--accent-bright);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(61,139,255,.3);"><div style="width:0;height:0;border-style:solid;border-width:8px 0 8px 14px;border-color:transparent transparent transparent var(--accent-bright);margin-left:3px;"></div></div>
+        </div>
+      </div>
+      <div class="reel-item-info"><div class="reel-item-tag">Video</div><div class="reel-item-name">Cinematic Edit</div></div>
+    </div>
+
+    <div class="reel-item">
+      <div class="reel-item-bg" style="background:#03050f;position:relative;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(61,139,255,.2),transparent 65%);"></div>
+        <span style="position:relative;z-index:1;font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--text);letter-spacing:.06em;">POSTER</span>
+      </div>
+      <div class="reel-item-info"><div class="reel-item-tag">Design</div><div class="reel-item-name">Poster Design</div></div>
+    </div>
+
+    <div class="reel-item">
+      <div class="reel-item-bg" style="background:#04080f;overflow:hidden;position:relative;">
+        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(0,209,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(0,209,255,.06) 1px,transparent 1px);background-size:30px 30px;animation:gm 8s linear infinite;"></div>
+        <span style="position:relative;z-index:1;font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--accent2);text-shadow:0 0 25px rgba(0,209,255,.5);">MOTION</span>
+      </div>
+      <div class="reel-item-info"><div class="reel-item-tag">Motion</div><div class="reel-item-name">Motion Graphics</div></div>
+    </div>
+
+    <div class="reel-item">
+      <div class="reel-item-bg" style="background:linear-gradient(135deg,var(--accent),#004ec2);">
+        <div style="padding:1rem;width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:rgba(255,255,255,.2);line-height:1;margin-bottom:.3rem;">05</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:#fff;line-height:1;text-shadow:0 0 20px rgba(255,255,255,.3);">BRAND<br>VIDEO</div>
+        </div>
+      </div>
+      <div class="reel-item-info"><div class="reel-item-tag">Brand</div><div class="reel-item-name">Promo Video</div></div>
+    </div>
+
+    <div class="reel-item">
+      <div class="reel-item-bg" style="background:#020510;overflow:hidden;position:relative;">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+          <div style="position:absolute;width:110px;height:110px;border:1px solid rgba(61,139,255,.25);border-radius:50%;animation:rsp 6s linear infinite;"></div>
+          <div style="position:absolute;width:65px;height:65px;border:1px solid rgba(0,209,255,.4);border-radius:50%;animation:rsp 3s linear infinite reverse;"></div>
+          <div style="width:8px;height:8px;background:var(--accent2);border-radius:50%;box-shadow:0 0 15px rgba(0,209,255,.8);"></div>
+        </div>
+        <span style="position:absolute;bottom:.7rem;left:.8rem;font-family:'Space Mono',monospace;font-size:.48rem;letter-spacing:.12em;color:rgba(0,209,255,.5);text-transform:uppercase;">Blender</span>
+      </div>
+      <div class="reel-item-info"><div class="reel-item-tag">3D</div><div class="reel-item-name">3D / Blender</div></div>
+    </div>
+
+    <div class="reel-item">
+      <div class="reel-item-bg" style="background:#030510;position:relative;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(61,139,255,.12));"></div>
+        <div style="position:relative;z-index:1;padding:1rem;height:100%;display:flex;flex-direction:column;justify-content:flex-end;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--text);line-height:.9;">COLOR<br>GRADE</div>
+        </div>
+      </div>
+      <div class="reel-item-info"><div class="reel-item-tag">Grade</div><div class="reel-item-name">Color Grading</div></div>
+    </div>
+
+    <div class="reel-item">
+      <div class="reel-item-bg" style="background:#030610;position:relative;overflow:hidden;">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-bright)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 8px rgba(61,139,255,.5));"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.5" fill="var(--accent-bright)" stroke="none"/></svg>
+          <div style="font-family:'Space Mono',monospace;font-size:.48rem;letter-spacing:.14em;color:rgba(61,139,255,.6);text-transform:uppercase;">Reels</div>
+        </div>
+      </div>
+      <div class="reel-item-info"><div class="reel-item-tag">Social</div><div class="reel-item-name">Instagram Reels</div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SERVICES -->
+<section class="section sec-border" id="services">
+  <div class="sec-eyebrow rv">What I Do</div>
+  <div class="svc-grid rv">
+    <div class="svc" data-tilt><div class="svc-n">01</div><div class="svc-icon"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div><div class="svc-title">Video Editing</div><div class="svc-desc">Precision cuts, smooth transitions, and cinematic grades. From short-form reels to full productions — every second counts.</div><div class="svc-tags"><span class="tag">CapCut</span><span class="tag">Premiere Pro</span><span class="tag">DaVinci</span></div></div>
+    <div class="svc" data-tilt><div class="svc-n">02</div><div class="svc-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 21V9"/></svg></div><div class="svc-title">Poster Design</div><div class="svc-desc">Bold typographic posters, event flyers, and campaign visuals with a sharp editorial edge. Every layout is intentional.</div><div class="svc-tags"><span class="tag">Photoshop</span><span class="tag">Illustrator</span></div></div>
+    <div class="svc" data-tilt><div class="svc-n">03</div><div class="svc-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l5 3"/></svg></div><div class="svc-title">Motion Graphics</div><div class="svc-desc">Kinetic titles, animated logos, and motion loops. Building visual worlds that move with purpose and rhythm.</div><div class="svc-tags"><span class="tag">After Effects</span><span class="tag">CapCut</span></div></div>
+    <div class="svc" data-tilt><div class="svc-n">04</div><div class="svc-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><div class="svc-title">3D Design</div><div class="svc-desc">Exploring depth with Blender — 3D elements, renders, and animations added to creative projects.</div><div class="svc-tags"><span class="tag">Blender</span><span class="tag">3D Modelling</span></div></div>
+    <div class="svc" data-tilt style="grid-column:span 2;"><div class="svc-n">05</div><div class="svc-icon"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="svc-title">Color Grading &amp; Brand Videos</div><div class="svc-desc">Professional colour grading, mood creation, and exposure correction — transforming raw footage into cinematic experiences. Plus full promotional and brand video edits crafted to showcase products and services memorably.</div><div class="svc-tags"><span class="tag">Premiere Pro</span><span class="tag">DaVinci</span><span class="tag">Lumetri</span><span class="tag">Brand Identity</span></div></div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="section sec-border" id="about">
+  <div class="sec-eyebrow rv">About Me</div>
+  <div class="about-grid">
+    <div class="rv">
+      <h2 class="about-h">CRAFT<br>MEETS<br><span>VISION</span></h2>
+      <p class="about-p">I'm Dhanush, a creative video editor specialising in cinematic storytelling, high impact social media content, and engaging visual experiences. My goal is simple: transform raw footage into content that captures attention, increases audience engagement, and leaves a lasting impression.</p>
+      <p class="about-p">I combine precise editing, professional colour grading, smooth transitions, and strong storytelling to create visually appealing videos that keep viewers watching. Every frame is carefully crafted to match the client's vision while maintaining a high standard of quality and creativity.</p>
+      <p class="about-p">Whether it's short-form content, promotional videos, travel films, cinematic edits, or brand-focused projects, I deliver results that help creators, businesses, and brands stand out in a crowded digital space. Great editing is not just about making videos look good — it's about creating content that connects with people, builds audiences, and drives impact.</p>
+      <p class="about-p hl">If you're looking for an editor who values creativity, attention to detail, and delivering work that exceeds expectations, you're in the right place. Let's create something unforgettable.</p>
+      <div class="skill-bars">
+        <div class="sb"><div class="sb-top"><span class="sb-name">Video Editing</span><span class="sb-pct">95%</span></div><div class="sb-track"><div class="sb-fill" style="width:95%;animation-delay:.1s;"></div></div></div>
+        <div class="sb"><div class="sb-top"><span class="sb-name">Poster Design</span><span class="sb-pct">90%</span></div><div class="sb-track"><div class="sb-fill" style="width:90%;animation-delay:.25s;"></div></div></div>
+        <div class="sb"><div class="sb-top"><span class="sb-name">Motion Graphics</span><span class="sb-pct">88%</span></div><div class="sb-track"><div class="sb-fill" style="width:88%;animation-delay:.4s;"></div></div></div>
+        <div class="sb"><div class="sb-top"><span class="sb-name">Color Grading</span><span class="sb-pct">85%</span></div><div class="sb-track"><div class="sb-fill" style="width:85%;animation-delay:.55s;"></div></div></div>
+        <div class="sb"><div class="sb-top"><span class="sb-name">After Effects</span><span class="sb-pct">82%</span></div><div class="sb-track"><div class="sb-fill" style="width:82%;animation-delay:.7s;"></div></div></div>
+        <div class="sb"><div class="sb-top"><span class="sb-name">3D / Blender</span><span class="sb-pct">55%</span></div><div class="sb-track"><div class="sb-fill" style="width:55%;animation-delay:.85s;"></div></div></div>
+      </div>
+    </div>
+    <div class="rv2">
+      <div class="profile-card" id="profileCard" data-tilt>
+        <div class="av">DN</div>
+        <div class="pname">DHANUSH</div>
+        <div class="prole">Visual Editor · Designer · Creator</div>
+        <div class="pstat"><span class="pslbl">Handle</span><span class="psval">@dnus6h</span></div>
+        <div class="pstat"><span class="pslbl">Specialty</span><span class="psval">Video &amp; Motion</span></div>
+        <div class="pstat"><span class="pslbl">Location</span><span class="psval">India</span></div>
+        <div class="pstat"><span class="pslbl">Tools</span><span class="psval">CC · AE · Pr · Blender</span></div>
+        <div class="pstat"><span class="pslbl">Status</span><span class="psval live">● Available</span></div>
+        <a href="https://www.instagram.com/dnus6h/" target="_blank" class="pc-ig mag">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+          @dnus6h on Instagram
+        </a>
+        <a href="mailto:gdhanush447@gmail.com" class="pc-mail mag">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8l10 7 10-7"/></svg>
+          gdhanush447@gmail.com
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="stats-bar rv" style="margin-top:4rem;">
+    <div class="stat-item"><div class="stat-num">100+</div><div class="stat-lbl">Hours Editing</div></div>
+    <div class="stat-item"><div class="stat-num">50+</div><div class="stat-lbl">Projects Done</div></div>
+    <div class="stat-item"><div class="stat-num">5+</div><div class="stat-lbl">Platforms</div></div>
+    <div class="stat-item"><div class="stat-num">∞</div><div class="stat-lbl">Ideas</div></div>
+  </div>
+</section>
+
+<!-- FEATURED -->
+<section class="section sec-border" id="featured">
+  <div class="sec-eyebrow rv">Featured Projects</div>
+  <div class="feat-grid rv">
+    <div class="fc" data-tilt><span class="fc-icon">🎬</span><div class="fc-title">Cinematic Edits</div><div class="fc-desc">High-quality cinematic videos with professional colour grading, smooth transitions, sound design, and storytelling techniques that create an immersive viewing experience.</div></div>
+    <div class="fc" data-tilt><span class="fc-icon">📱</span><div class="fc-title">Social Media Content</div><div class="fc-desc">Short-form content optimised for Instagram Reels, YouTube Shorts, and TikTok, designed to maximise engagement, retention, and shareability.</div></div>
+    <div class="fc" data-tilt><span class="fc-icon">🎨</span><div class="fc-title">Color Grading</div><div class="fc-desc">Transforming raw footage with cinematic colour grading, mood creation, exposure correction, and visual consistency.</div></div>
+    <div class="fc" data-tilt><span class="fc-icon">✨</span><div class="fc-title">Motion Graphics &amp; Effects</div><div class="fc-desc">Creative text animations, visual effects, transitions, and motion graphics that enhance storytelling and make content more dynamic.</div></div>
+    <div class="fc wide" data-tilt><span class="fc-icon">🚀</span><div class="fc-title">Promotional &amp; Brand Videos</div><div class="fc-desc">Professional edits crafted to showcase products, services, and brands in a compelling and memorable way — built to convert viewers into customers and help brands stand out.</div></div>
+    <div class="fc" data-tilt><span class="fc-icon">🧊</span><div class="fc-title">3D Design — Blender</div><div class="fc-desc">Exploring 3D modelling, rendering, and animation in Blender — adding depth, dimension, and immersive visuals to creative projects.</div></div>
+  </div>
+  <div class="stat-grid rv">
+    <div class="sg-item"><span class="sg-icon">📈</span><div class="sg-text"><strong>100+ Hours of Editing Experience</strong><span>Dedicated time behind the timeline crafting high-quality content.</span></div></div>
+    <div class="sg-item"><span class="sg-icon">🎬</span><div class="sg-text"><strong>Multiple Projects Completed</strong><span>Cinematic &amp; social media projects delivered and published.</span></div></div>
+    <div class="sg-item"><span class="sg-icon">📱</span><div class="sg-text"><strong>Short-Form Platform Expert</strong><span>Content edited for Instagram Reels &amp; short-form platforms.</span></div></div>
+    <div class="sg-item"><span class="sg-icon">⚡</span><div class="sg-text"><strong>Fast Turnaround</strong><span>Quick delivery without compromising quality or attention to detail.</span></div></div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="contact-wrap" id="contact">
+  <div class="sec-eyebrow rv" style="justify-content:center;">Let's Create</div>
+  <h2 class="contact-h rv">LET'S<br><span class="ol">MAKE IT</span></h2>
+  <p class="contact-sub rv">Got a project? I'm open to video edits, poster designs, motion work and creative collabs. Let's build something unforgettable.</p>
+  <div class="contact-pills rv">
+    <div class="cpill"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8l10 7 10-7"/></svg>gdhanush447@gmail.com</div>
+    <div class="cpill"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.5" fill="var(--accent-bright)" stroke="none"/></svg>@dnus6h</div>
+  </div>
+  <div class="contact-btns rv">
+    <a href="https://www.instagram.com/dnus6h/" target="_blank" class="btn-blue mag">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+      DM on Instagram
+    </a>
+    <a href="mailto:gdhanush447@gmail.com" class="btn-ghost mag">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8l10 7 10-7"/></svg>
+      gdhanush447@gmail.com
+    </a>
+  </div>
+</section>
+
+<footer>
+  <div>© 2025 dnus6h — Dhanush</div>
+  <div>Visual Artist · India</div>
+  <div><a href="https://www.instagram.com/dnus6h/" target="_blank">@dnus6h</a> · <a href="mailto:gdhanush447@gmail.com">gdhanush447@gmail.com</a></div>
+</footer>
+
+<script async src="https://www.instagram.com/embed.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CONSTELLATION BACKGROUND
+// Stars drift slowly. Mouse cursor acts as a gravity well —
+// nearby stars get pulled toward it and lines form between them.
+// Shooting stars streak across occasionally.
+// ══════════════════════════════════════════════════════════════════
+const bg = document.getElementById('bg');
+const ctx = bg.getContext('2d');
+let W = bg.width  = window.innerWidth;
+let H = bg.height = window.innerHeight;
+window.addEventListener('resize', () => {
+  W = bg.width  = window.innerWidth;
+  H = bg.height = window.innerHeight;
+  initStars();
+});
+
+// Mouse
+let mx = W/2, my = H/2;
+window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+// ── Star class ──────────────────────────────────────────────────
+const NUM_STARS   = 160;
+const CONNECT_DIST = 130;   // px — lines form within this range
+const CURSOR_PULL  = 140;   // px — cursor attracts stars
+const PULL_FORCE   = 0.012; // acceleration toward cursor
+const STAR_SPEED   = 0.25;
+
+class Star {
+  constructor() { this.reset(true); }
+  reset(randomPos = false) {
+    this.x  = randomPos ? Math.random() * W : Math.random() < .5 ? 0 : W;
+    this.y  = randomPos ? Math.random() * H : Math.random() * H;
+    this.ox = this.x; this.oy = this.y;   // origin (drifts)
+    this.vx = (Math.random() - .5) * STAR_SPEED;
+    this.vy = (Math.random() - .5) * STAR_SPEED;
+    this.r  = Math.random() * 1.4 + 0.4;
+    // colour: mostly white/blue-white, some vivid blue, rare cyan
+    const roll = Math.random();
+    if (roll > .96)      { this.color = '#00d1ff'; this.glow = 'rgba(0,209,255,'; }
+    else if (roll > .88) { this.color = '#3d8bff'; this.glow = 'rgba(61,139,255,'; }
+    else if (roll > .70) { this.color = 'rgba(180,200,255,.9)'; this.glow = 'rgba(180,200,255,'; }
+    else                 { this.color = 'rgba(232,238,255,.6)'; this.glow = 'rgba(232,238,255,'; }
+    this.twinkle = Math.random() * Math.PI * 2; // phase
+    this.twinkleSpeed = 0.02 + Math.random() * 0.03;
+    this.pulled = false;
+  }
+  update(t) {
+    this.twinkle += this.twinkleSpeed;
+    const tw = 0.7 + 0.3 * Math.sin(this.twinkle); // 0.7–1.0 opacity flicker
+
+    // drift origin slowly
+    this.ox += this.vx * 0.3;
+    this.oy += this.vy * 0.3;
+
+    // cursor gravity pull
+    const dx = mx - this.x, dy = my - this.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < CURSOR_PULL) {
+      const force = (1 - dist / CURSOR_PULL) * PULL_FORCE;
+      this.x += dx * force * 2.2;
+      this.y += dy * force * 2.2;
+      this.pulled = true;
+    } else {
+      // drift back toward origin
+      this.x += (this.ox - this.x) * 0.04 + this.vx * 0.6;
+      this.y += (this.oy - this.y) * 0.04 + this.vy * 0.6;
+      this.pulled = false;
+    }
+
+    // wrap origin
+    if (this.ox < -50) this.ox = W + 50;
+    if (this.ox > W+50) this.ox = -50;
+    if (this.oy < -50) this.oy = H + 50;
+    if (this.oy > H+50) this.oy = -50;
+
+    this._tw = tw;
+  }
+  draw() {
+    const tw = this._tw;
+    // glow halo
+    const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r * 4);
+    grad.addColorStop(0,   this.glow + (tw * .4) + ')');
+    grad.addColorStop(1,   this.glow + '0)');
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r * 4, 0, Math.PI*2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // core
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI*2);
+    ctx.fillStyle = this.pulled
+      ? `rgba(0,209,255,${tw})`
+      : this.color.includes('rgba') ? this.color : this.color;
+    ctx.fill();
+  }
+}
+
+// ── Shooting star class ─────────────────────────────────────────
+class Shoot {
+  constructor() { this.reset(); }
+  reset() {
+    this.x  = Math.random() * W;
+    this.y  = Math.random() * H * 0.5;
+    this.len = 80 + Math.random() * 120;
+    this.speed = 8 + Math.random() * 8;
+    this.angle = Math.PI / 5 + (Math.random() - .5) * .4;
+    this.life = 1;
+    this.decay = 0.018 + Math.random() * 0.012;
+    this.active = false;
+    this.timer = 180 + Math.random() * 400; // frames until next
+  }
+  update() {
+    if (!this.active) { this.timer--; if (this.timer <= 0) this.active = true; return; }
+    this.x += Math.cos(this.angle) * this.speed;
+    this.y += Math.sin(this.angle) * this.speed;
+    this.life -= this.decay;
+    if (this.life <= 0) this.reset();
+  }
+  draw() {
+    if (!this.active) return;
+    const tx = this.x - Math.cos(this.angle) * this.len;
+    const ty = this.y - Math.sin(this.angle) * this.len;
+    const g = ctx.createLinearGradient(tx, ty, this.x, this.y);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(.6, `rgba(180,210,255,${this.life * .5})`);
+    g.addColorStop(1, `rgba(255,255,255,${this.life})`);
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(this.x, this.y);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 1.5 * this.life;
+    ctx.stroke();
+  }
+}
+
+// ── Cursor "constellation hub" glow ────────────────────────────
+function drawCursorGlow() {
+  const g = ctx.createRadialGradient(mx, my, 0, mx, my, CURSOR_PULL);
+  g.addColorStop(0,   'rgba(61,139,255,.06)');
+  g.addColorStop(.5,  'rgba(0,102,255,.03)');
+  g.addColorStop(1,   'rgba(0,102,255,0)');
+  ctx.beginPath();
+  ctx.arc(mx, my, CURSOR_PULL, 0, Math.PI*2);
+  ctx.fillStyle = g;
+  ctx.fill();
+}
+
+// ── Init ────────────────────────────────────────────────────────
+let stars = [], shoots = [];
+function initStars() {
+  stars  = Array.from({length: NUM_STARS}, () => new Star());
+  shoots = Array.from({length: 3}, () => new Shoot());
+}
+initStars();
+
+// ── Render loop ─────────────────────────────────────────────────
+let frame = 0;
+function render() {
+  requestAnimationFrame(render);
+  frame++;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // deep space gradient
+  const bg2 = ctx.createRadialGradient(W*.5, H*.4, 0, W*.5, H*.4, Math.max(W,H)*.8);
+  bg2.addColorStop(0, 'rgba(8,14,38,.15)');
+  bg2.addColorStop(1, 'rgba(3,5,15,0)');
+  ctx.fillStyle = bg2;
+  ctx.fillRect(0, 0, W, H);
+
+  // cursor glow
+  drawCursorGlow();
+
+  // update & draw stars
+  stars.forEach(s => s.update(frame));
+
+  // draw constellation lines between nearby stars
+  for (let i = 0; i < stars.length; i++) {
+    for (let j = i+1; j < stars.length; j++) {
+      const a = stars[i], b = stars[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const d  = Math.sqrt(dx*dx + dy*dy);
+      if (d < CONNECT_DIST) {
+        const alpha = (1 - d / CONNECT_DIST) * 0.22;
+        // brighter lines when either star is near cursor
+        const boost = (a.pulled || b.pulled) ? 2.5 : 1;
+        // color: cyan if either is pulled, else blue-white
+        const lineColor = (a.pulled || b.pulled)
+          ? `rgba(0,209,255,${alpha * boost})`
+          : `rgba(100,160,255,${alpha * boost})`;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth = a.pulled || b.pulled ? 0.8 : 0.4;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // draw stars on top of lines
+  stars.forEach(s => s.draw());
+
+  // cursor dot in constellation (small crosshair)
+  ctx.beginPath();
+  ctx.arc(mx, my, 2.5, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,209,255,.7)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(mx, my, 7, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(61,139,255,.25)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // shooting stars
+  shoots.forEach(s => { s.update(); s.draw(); });
+}
+render();
+
+
+// ── CURSOR ───────────────────────────────────────────────────────
+const cur=document.getElementById('cur'),curR=document.getElementById('cur-ring');
+let cx=0,cy=0,rx=0,ry=0;
+// mx/my already tracked by constellation above
+window.addEventListener('mousemove',e=>{cx=e.clientX;cy=e.clientY;});
+addEventListener('mousedown',()=>document.body.classList.add('clicking'));
+addEventListener('mouseup',()=>document.body.classList.remove('clicking'));
+
+(function curLoop(){
+  cur.style.left=cx+'px';cur.style.top=cy+'px';
+  rx+=(cx-rx)*.1;ry+=(cy-ry)*.1;
+  curR.style.left=rx+'px';curR.style.top=ry+'px';
+  requestAnimationFrame(curLoop);
+})();
+
+// ── MAGNETIC INTERACTION ─────────────────────────────────────────
+// Elements with class .mag get physically pulled toward cursor
+const MAGNET_STRENGTH = 0.38; // 0–1, how far they pull
+const MAGNET_RADIUS   = 90;   // px radius of effect
+
+const magEls = [...document.querySelectorAll('.mag,.btn-blue,.btn-ghost,.btn-red,.pc-ig,.pc-mail,.nav-cta')];
+
+function applyMagnetic(){
+  magEls.forEach(el=>{
+    const r=el.getBoundingClientRect();
+    const elCx=r.left+r.width/2, elCy=r.top+r.height/2;
+    const dx=cx-elCx, dy=cy-elCy;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<MAGNET_RADIUS){
+      const pull=(1-dist/MAGNET_RADIUS)*MAGNET_STRENGTH;
+      el.style.transform=`translate(${dx*pull}px,${dy*pull}px)`;
+      document.body.classList.add('on-magnet');
+    } else {
+      el.style.transform='translate(0,0)';
+    }
+  });
+  requestAnimationFrame(applyMagnetic);
+}
+applyMagnetic();
+
+// track if ANY magnet is near cursor
+(function checkMagnet(){
+  let near=false;
+  magEls.forEach(el=>{
+    const r=el.getBoundingClientRect();
+    const dx=cx-(r.left+r.width/2), dy=cy-(r.top+r.height/2);
+    if(Math.sqrt(dx*dx+dy*dy)<MAGNET_RADIUS) near=true;
+  });
+  document.body.classList.toggle('on-magnet',near);
+  requestAnimationFrame(checkMagnet);
+})();
+
+// ── NAV SCROLL ───────────────────────────────────────────────────
+const nav=document.getElementById('nav');
+addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>60));
+
+// ── SCROLL REVEAL ────────────────────────────────────────────────
+const revObs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('on');}),{threshold:.08});
+document.querySelectorAll('.rv,.rv2').forEach(el=>revObs.observe(el));
+
+// ── 3D TILT ──────────────────────────────────────────────────────
+document.querySelectorAll('[data-tilt],.svc,.fc').forEach(el=>{
+  el.addEventListener('mousemove',e=>{
+    const r=el.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;
+    // don't fight with magnetic on .mag elements
+    if(!el.classList.contains('mag')){
+      el.style.transform=`perspective(900px) rotateX(${(y-.5)*14}deg) rotateY(${(x-.5)*-14}deg) translateZ(8px)`;
+    }
+    el.style.setProperty('--mx',(x*100)+'%');el.style.setProperty('--my',(y*100)+'%');
+  });
+  el.addEventListener('mouseleave',()=>{
+    if(!el.classList.contains('mag')) el.style.transform='';
+  });
+});
+
+// ── DRAGGABLE REEL ───────────────────────────────────────────────
+const strip=document.getElementById('reelStrip');
+let isDown=false,startX,scrollLeft;
+strip.addEventListener('mousedown',e=>{isDown=true;strip.classList.add('dragging');startX=e.pageX-strip.offsetLeft;scrollLeft=strip.scrollLeft;});
+strip.addEventListener('mouseleave',()=>{isDown=false;strip.classList.remove('dragging');});
+strip.addEventListener('mouseup',()=>{isDown=false;strip.classList.remove('dragging');});
+strip.addEventListener('mousemove',e=>{if(!isDown)return;e.preventDefault();const x=e.pageX-strip.offsetLeft;strip.scrollLeft=scrollLeft-(x-startX)*1.4;});
+strip.addEventListener('touchstart',e=>{startX=e.touches[0].pageX-strip.offsetLeft;scrollLeft=strip.scrollLeft;},{passive:true});
+strip.addEventListener('touchmove',e=>{const x=e.touches[0].pageX-strip.offsetLeft;strip.scrollLeft=scrollLeft-(x-startX);},{passive:true});
+
+// ── IG COVER CLICK ───────────────────────────────────────────────
+document.querySelectorAll('.ig-post').forEach(post=>{
+  const cover=post.querySelector('.ig-cover');
+  if(cover) cover.addEventListener('click',()=>{cover.style.opacity='0';cover.style.pointerEvents='none';});
+});
+</script>
+</body>
+</html>
